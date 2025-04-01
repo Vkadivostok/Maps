@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Оптимизированный путеводитель по Подмосковью</title>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=682f1796-35fb-475b-9578-a0081d2255b2&lang=ru_RU" type="text/javascript"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #e0eafc, #cfdef3);
+            margin: 0;
+            padding: 0;
+            color: #333;
+            overflow-x: hidden;
+        }
+        h1 {
+            text-align: center;
+            padding: 15px;
+            color: #2c3e50;
+            font-size: 1.5em;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+        }
+        #map-container {
+            position: relative;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        #map-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            opacity: 0.2;
+        }
+        #map {
+            position: relative;
+            width: 100%;
+            height: 50vh;
+            max-height: 600px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            background: #fff;
+            z-index: 2;
+        }
+        .day-label {
+            font-weight: bold;
+            color: #e74c3c;
+            margin-bottom: 5px;
+        }
+        .baloon-content a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .baloon-content a:hover {
+            text-decoration: underline;
+        }
+        .wiki-link, .official-link {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .wiki-link:hover, .official-link:hover {
+            text-decoration: underline;
+        }
+        .wiki-link {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .address-link {
+            color: #27ae60;
+            text-decoration: none;
+        }
+        .address-link:hover {
+            text-decoration: underline;
+        }
+        #route-description {
+            width: 90%;
+            margin: 15px auto;
+            padding: 15px;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            font-size: 0.9em;
+        }
+        #route-description h2 {
+            color: #2c3e50;
+            margin-top: 0;
+            font-size: 1.2em;
+        }
+        #route-description .day-section {
+            display: none;
+            margin: 10px 0;
+        }
+        #route-description .day-section.active {
+            display: block;
+        }
+        #route-description .day {
+            font-weight: bold;
+            color: #e67e22;
+        }
+        #route-description ul {
+            list-style: none;
+            padding: 0;
+        }
+        #route-description li {
+            margin: 5px 0;
+        }
+        #route-description .route-step {
+            margin: 8px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background: rgba(0, 0, 0, 0.05);
+        }
+        .day1-color { color: #3498db; }
+        .day2-color { color: #e67e22; }
+        .day3-color { color: #27ae60; }
+        .full-color { color: #8e44ad; }
+        #controls {
+            text-align: center;
+            margin: 10px auto;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 5px;
+        }
+        #controls button {
+            padding: 8px 15px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-size: 0.9em;
+        }
+        #controls button:hover {
+            background: #2980b9;
+        }
+        #controls button.active {
+            background: #e67e22;
+        }
+        details {
+            margin: 10px 0;
+            padding: 5px;
+        }
+        summary {
+            cursor: pointer;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        details[open] summary {
+            color: #e67e22;
+        }
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.2em;
+            }
+            #map {
+                height: 40vh;
+            }
+            #route-description {
+                font-size: 0.8em;
+            }
+            #controls button {
+                padding: 6px 10px;
+                font-size: 0.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Оптимизированный путеводитель по Подмосковью на 3 дня</h1>
+    <div id="controls">
+        <button id="day1" class="active" onclick="showRoute('day1')">День 1</button>
+        <button id="day2" onclick="showRoute('day2')">День 2</button>
+        <button id="day3" onclick="showRoute('day3')">День 3</button>
+        <button id="full" onclick="showRoute('full')">Общий маршрут</button>
+    </div>
+    <div id="map-container">
+        <canvas id="map-canvas"></canvas>
+        <div id="map"></div>
+    </div>
+    <div id="route-description">
+        <h2>Описание маршрута</h2>
+        <div id="desc-day1" class="day-section active">
+            <span class="day">День 1:</span>
+            <div class="route-step day1-color">
+                1. <a href="yandexmaps://maps.yandex.ru/?text=Старт: Москва, ул. Реутовская, 12к1" class="address-link">Старт</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Усадьба Остафьево, Москва, поселение Рязановское, село Остафьево, ул. Троицкая, 1А" class="address-link">Усадьба Остафьево</a> (25 км, ~40 мин)
+            </div>
+            <div class="route-step day1-color">
+                2. <a href="yandexmaps://maps.yandex.ru/?text=Усадьба Остафьево, Москва, поселение Рязановское, село Остафьево, ул. Троицкая, 1А" class="address-link">Усадьба Остафьево</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Церковь Знамения в Дубровицах, Москва, поселение Десеновское, село Дубровицы" class="address-link">Церковь Знамения в Дубровицах</a> (25 км, ~30 мин)
+            </div>
+            <div class="route-step day1-color">
+                3. <a href="yandexmaps://maps.yandex.ru/?text=Церковь Знамения в Дубровицах, Москва, поселение Десеновское, село Дубровицы" class="address-link">Церковь Знамения в Дубровицах</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Парк 'Патриот', Московская область, Одинцовский район, 55-й км Минского шоссе" class="address-link">Парк "Патриот"</a> (45 км, ~50 мин)
+            </div>
+            <div class="route-step day1-color">
+                4. <a href="yandexmaps://maps.yandex.ru/?text=Парк 'Патриот', Московская область, Одинцовский район, 55-й км Минского шоссе" class="address-link">Парк "Патриот"</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Звенигород, Московская область, г. Звенигород, ул. Московская" class="address-link">Звенигород</a> (20 км, ~30 мин, ночевка)
+            </div>
+            <strong>Пробег: ~115 км</strong>
+            <ul>
+                <li><strong>Рекомендации:</strong> Начните с Усадьбы Остафьево — осмотрите дворец и парк, связанные с Пушкиным. Затем посетите барочную Церковь Знамения в Дубровицах. В Парке "Патриот" проведите 2-3 часа: музей техники и Главный храм Вооруженных сил обязательны. Завершите день в Звенигороде, выбрав отель (например, "Татьяна Провинция").</li>
+                <li><strong>Достопримечательности по пути:</strong> Река Десна около Остафьево, старинный усадебный парк в Дубровицах, леса вдоль Минского шоссе к Парку "Патриот".</li>
+            </ul>
+            <details>
+                <summary>Подробные рекомендации по объектам</summary>
+                <p><strong>Усадьба Остафьево:</strong> Уделите 1-1,5 часа. Осмотрите главный дом с экспозицией о Пушкине и Вяземских, прогуляйтесь по парку с прудами. Посетители рекомендуют взять экскурсию (около 300 руб.) для полного погружения в историю. На территории есть кафе, но отзывы советуют захватить перекус с собой, так как выбор небольшой.<br>
+                <a href="https://ru.wikipedia.org/wiki/Остафьево_(усадьба)" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="http://www.ostafyevomuseum.ru/" target="_blank" class="official-link">Официальный сайт</a></p>
+                
+                <p><strong>Церковь Знамения в Дубровицах:</strong> Планируйте 30-40 минут. Уникальная архитектура в стиле барокко поражает — не забудьте фотоаппарат. Внутри храм часто закрыт, но виды снаружи стоят того. Туристы советуют прогуляться к реке Пахре и осмотреть усадебный парк рядом.<br>
+                <a href="https://ru.wikipedia.org/wiki/Церковь_Знамения_Пресвятой_Богородицы_в_Дубровицах" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="http://dubrovitsy-hram.ru/" target="_blank" class="official-link">Официальный сайт</a></p>
+                
+                <p><strong>Парк "Патриот":</strong> Минимум 2-3 часа. Главные точки — музей военной техники (вход ~500 руб.) и Главный храм Вооруженных сил (бесплатно). Отзывы хвалят масштабность, но предупреждают о больших расстояниях между объектами — удобная обувь обязательна. Еда в кафе на территории дорогая, лучше взять с собой.<br>
+                <a href="https://ru.wikipedia.org/wiki/Патриот_(парк)" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="https://patriotp.ru/" target="_blank" class="official-link">Официальный сайт</a></p>
+                
+                <p><strong>Звенигород (ночевка):</strong> Выберите отель "Татьяна Провинция" (от 3500 руб./ночь) или "Звенигород" (от 3000 руб.). Гости хвалят уют и близость к центру. Вечером прогуляйтесь по набережной Москвы-реки, попробуйте местные пироги в кафе "Усадьба" (средний чек ~700 руб.).<br>
+                <a href="https://ru.wikipedia.org/wiki/Звенигород" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="https://zvenigorod.ru/" target="_blank" class="official-link">Официальный сайт города</a></p>
+            </details>
+        </div>
+        <div id="desc-day2" class="day-section">
+            <span class="day">День 2:</span>
+            <div class="route-step day2-color">
+                1. <a href="yandexmaps://maps.yandex.ru/?text=Звенигород, Московская область, г. Звенигород, ул. Московская" class="address-link">Звенигород</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Саввино-Сторожевский монастырь, Московская область, г. Звенигород, ул. Советская" class="address-link">Саввино-Сторожевский монастырь</a> (5 км, ~10 мин)
+            </div>
+            <div class="route-step day2-color">
+                2. <a href="yandexmaps://maps.yandex.ru/?text=Саввино-Сторожевский монастырь, Московская область, г. Звенигород, ул. Советская" class="address-link">Саввино-Сторожевский монастырь</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Новоиерусалимский монастырь, Московская область, г. Истра, ул. Советская, 2" class="address-link">Новоиерусалимский монастырь</a> (40 км, ~50 мин)
+            </div>
+            <div class="route-step day2-color">
+                3. <a href="yandexmaps://maps.yandex.ru/?text=Новоиерусалимский монастырь, Московская область, г. Истра, ул. Советская, 2" class="address-link">Новоиерусалимский монастырь</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Можайский кремль, Московская область, г. Можайск, ул. Кремлевская" class="address-link">Можайский кремль</a> (75 км, ~1 ч 15 мин, ночевка)
+            </div>
+            <strong>Пробег: ~120 км</strong>
+            <ul>
+                <li><strong>Рекомендации:</strong> Утром посетите Саввино-Сторожевский монастырь — Рождественский собор XV века и виды на долину. В Новоиерусалимском монастыре уделите время Воскресенскому собору и музею. В Можайске осмотрите Никольский собор в кремле и Лужецкий монастырь. Ночлег в гостинице "Можайск".</li>
+                <li><strong>Достопримечательности по пути:</strong> Долина Москвы-реки около Звенигорода, река Истра по пути к Истре, холмы и леса на трассе к Можайску.</li>
+            </ul>
+            <details>
+                <summary>Подробные рекомендации по объектам</summary>
+                <p><strong>Саввино-Сторожевский монастырь:</strong> Планируйте 1-1,5 часа. Осмотрите Рождественский собор и колокольню, поднимитесь на смотровую площадку — виды потрясающие. Отзывы советуют купить монастырский хлеб и квас в лавке (около 100-150 руб.). Учтите, что парковка может быть переполнена в выходные.<br>
+                <a href="https://ru.wikipedia.org/wiki/Саввино-Сторожевский_монастырь" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="http://www.savvastor.ru/" target="_blank" class="official-link">Официальный сайт</a></p>
+                
+                <p><strong>Новоиерусалимский монастырь:</strong> 2 часа минимум. Воскресенский собор — главная жемчужина, вход в музей ~400 руб. Посетители рекомендуют экскурсию, чтобы понять историю "русской Палестины". Рядом есть кафе "Трапезная" с домашней едой (средний чек ~500 руб.).<br>
+                <a href="https://ru.wikipedia.org/wiki/Новоиерусалимский_монастырь" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="https://njerusalem.ru/" target="_blank" class="official-link">Официальный сайт</a></p>
+                
+                <p><strong>Можайский кремль (ночевка):</strong> 1-1,5 часа. Никольский собор впечатляет, но сам кремль частично в руинах — подойдет для любителей истории. Лужецкий монастырь (10 мин от кремля) тоже стоит внимания. Ночлег в гостинице "Можайск" (от 2500 руб./ночь) хвалят за чистоту, ужинайте в "Старый город" (чек ~600 руб.).<br>
+                <a href="https://ru.wikipedia.org/wiki/Можайский_кремль" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="https://mozhaysk-kreml.ru/" target="_blank" class="official-link">Официальный сайт</a></p>
+            </details>
+        </div>
+        <div id="desc-day3" class="day-section">
+            <span class="day">День 3:</span>
+            <div class="route-step day3-color">
+                1. <a href="yandexmaps://maps.yandex.ru/?text=Можайск, Московская область, г. Можайск, ул. Кремлевская" class="address-link">Можайск</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Бородинское поле, Московская область, Можайский район, деревня Бородино" class="address-link">Бородинское поле</a> (15 км, ~20 мин)
+            </div>
+            <div class="route-step day3-color">
+                2. <a href="yandexmaps://maps.yandex.ru/?text=Бородинское поле, Московская область, Можайский район, деревня Бородино" class="address-link">Бородинское поле</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Усадьба Архангельское, Московская область, Красногорский район, поселок Архангельское, ул. Ильинское шоссе" class="address-link">Усадьба Архангельское</a> (95 км, ~1 ч 30 мин)
+            </div>
+            <div class="route-step day3-color">
+                3. <a href="yandexmaps://maps.yandex.ru/?text=Усадьба Архангельское, Московская область, Красногорский район, поселок Архангельское, ул. Ильинское шоссе" class="address-link">Усадьба Архангельское</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Финиш: Москва, ул. Реутовская, 12к1" class="address-link">Финиш</a> (25 км, ~40 мин)
+            </div>
+            <strong>Пробег: ~180 км</strong>
+            <ul>
+                <li><strong>Рекомендации:</strong> Начните с Бородинского поля — батарея Раевского и Спасо-Бородинский монастырь (2-3 часа). В Усадьбе Архангельское осмотрите дворец и парк ("русский Версаль"). Вернитесь в Москву к вечеру.</li>
+                <li><strong>Достопримечательности по пути:</strong> Памятники 1812 года на Бородинском поле, живописные виды Минского шоссе, река Москва около Архангельского.</li>
+            </ul>
+            <details>
+                <summary>Подробные рекомендации по объектам</summary>
+                <p><strong>Бородинское поле:</strong> 2-3 часа. Посетите батарею Раевского, музей (вход ~300 руб.) и Спасо-Бородинский монастырь. Отзывы советуют взять аудиогид или экскурсию (от 500 руб.), чтобы разобраться в истории битвы 1812 года. Перекус возможен в кафе у музея, но лучше иметь свой.<br>
+                <a href="https://ru.wikipedia.org/wiki/Бородинское_поле" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="https://borodino.ru/" target="_blank" class="official-link">Официальный сайт</a></p>
+                
+                <p><strong>Усадьба Архангельское:</strong> 1,5-2 часа. Дворец открыт для посещения (вход ~400 руб.), но парк — главная ценность ("русский Версаль"). Туристы хвалят виды у Большого партера и рекомендуют удобную обувь для прогулок. Кафе "Колоннада" дорогое (чек ~800 руб.), берите воду и еду с собой.<br>
+                <a href="https://ru.wikipedia.org/wiki/Архангельское_(усадьба)" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="http://arhangelskoe.su/" target="_blank" class="official-link">Официальный сайт</a></p>
+            </details>
+        </div>
+        <div id="desc-full" class="day-section">
+            <span class="day">Общий маршрут:</span>
+            <div class="route-step full-color">
+                1. <a href="yandexmaps://maps.yandex.ru/?text=Старт: Москва, ул. Реутовская, 12к1" class="address-link">Старт</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Усадьба Остафьево, Москва, поселение Рязановское, село Остафьево, ул. Троицкая, 1А" class="address-link">Усадьба Остафьево</a> (25 км, ~40 мин)
+            </div>
+            <div class="route-step full-color">
+                2. <a href="yandexmaps://maps.yandex.ru/?text=Усадьба Остафьево, Москва, поселение Рязановское, село Остафьево, ул. Троицкая, 1А" class="address-link">Усадьба Остафьево</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Церковь Знамения в Дубровицах, Москва, поселение Десеновское, село Дубровицы" class="address-link">Церковь Знамения в Дубровицах</a> (25 км, ~30 мин)
+            </div>
+            <div class="route-step full-color">
+                3. <a href="yandexmaps://maps.yandex.ru/?text=Церковь Знамения в Дубровицах, Москва, поселение Десеновское, село Дубровицы" class="address-link">Церковь Знамения в Дубровицах</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Парк 'Патриот', Московская область, Одинцовский район, 55-й км Минского шоссе" class="address-link">Парк "Патриот"</a> (45 км, ~50 мин)
+            </div>
+            <div class="route-step full-color">
+                4. <a href="yandexmaps://maps.yandex.ru/?text=Парк 'Патриот', Московская область, Одинцовский район, 55-й км Минского шоссе" class="address-link">Парк "Патриот"</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Звенигород, Московская область, г. Звенигород, ул. Московская" class="address-link">Звенигород</a> (20 км, ~30 мин, ночевка)
+            </div>
+            <div class="route-step full-color">
+                5. <a href="yandexmaps://maps.yandex.ru/?text=Звенигород, Московская область, г. Звенигород, ул. Московская" class="address-link">Звенигород</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Саввино-Сторожевский монастырь, Московская область, г. Звенигород, ул. Советская" class="address-link">Саввино-Сторожевский монастырь</a> (5 км, ~10 мин)
+            </div>
+            <div class="route-step full-color">
+                6. <a href="yandexmaps://maps.yandex.ru/?text=Саввино-Сторожевский монастырь, Московская область, г. Звенигород, ул. Советская" class="address-link">Саввино-Сторожевский монастырь</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Новоиерусалимский монастырь, Московская область, г. Истра, ул. Советская, 2" class="address-link">Новоиерусалимский монастырь</a> (40 км, ~50 мин)
+            </div>
+            <div class="route-step full-color">
+                7. <a href="yandexmaps://maps.yandex.ru/?text=Новоиерусалимский монастырь, Московская область, г. Истра, ул. Советская, 2" class="address-link">Новоиерусалимский монастырь</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Можайский кремль, Московская область, г. Можайск, ул. Кремлевская" class="address-link">Можайский кремль</a> (75 км, ~1 ч 15 мин, ночевка)
+            </div>
+            <div class="route-step full-color">
+                8. <a href="yandexmaps://maps.yandex.ru/?text=Можайский кремль, Московская область, г. Можайск, ул. Кремлевская" class="address-link">Можайский кремль</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Бородинское поле, Московская область, Можайский район, деревня Бородино" class="address-link">Бородинское поле</a> (15 км, ~20 мин)
+            </div>
+            <div class="route-step full-color">
+                9. <a href="yandexmaps://maps.yandex.ru/?text=Бородинское поле, Московская область, Можайский район, деревня Бородино" class="address-link">Бородинское поле</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Усадьба Архангельское, Московская область, Красногорский район, поселок Архангельское, ул. Ильинское шоссе" class="address-link">Усадьба Архангельское</a> (95 км, ~1 ч 30 мин)
+            </div>
+            <div class="route-step full-color">
+                10. <a href="yandexmaps://maps.yandex.ru/?text=Усадьба Архангельское, Московская область, Красногорский район, поселок Архангельское, ул. Ильинское шоссе" class="address-link">Усадьба Архангельское</a> → 
+                <a href="yandexmaps://maps.yandex.ru/?text=Финиш: Москва, ул. Реутовская, 12к1" class="address-link">Финиш</a> (25 км, ~40 мин)
+            </div>
+            <strong>Пробег: ~415 км</strong>
+            <ul>
+                <li><strong>Рекомендации:</strong> Планируйте 3 дня: первый — юг и запад от Москвы, второй — исторические монастыри, третий — военная история и возвращение. Ночевки в Звенигороде и Можайске.</li>
+                <li><strong>Достопримечательности по пути:</strong> Реки Десна, Истра и Москва, леса Подмосковья, исторические памятники вдоль трасс М1 и М9.</li>
+            </ul>
+            <details>
+                <summary>Подробные рекомендации по объектам</summary>
+                <p><strong>Усадьба Остафьево:</strong> Уделите 1-1,5 часа. Осмотрите главный дом с экспозицией о Пушкине и Вяземских, прогуляйтесь по парку с прудами. Посетители рекомендуют взять экскурсию (около 300 руб.) для полного погружения в историю. На территории есть кафе, но отзывы советуют захватить перекус с собой, так как выбор небольшой.<br>
+                <a href="https://ru.wikipedia.org/wiki/Остафьево_(усадьба)" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="http://www.ostafyevomuseum.ru/" target="_blank" class="official-link">Официальный сайт</a></p>
+                
+                <p><strong>Церковь Знамения в Дубровицах:</strong> Планируйте 30-40 минут. Уникальная архитектура в стиле барокко поражает — не забудьте фотоаппарат. Внутри храм часто закрыт, но виды снаружи стоят того. Туристы советуют прогуляться к реке Пахре и осмотреть усадебный парк рядом.<br>
+                <a href="https://ru.wikipedia.org/wiki/Церковь_Знамения_Пресвятой_Богородицы_в_Дубровицах" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="http://dubrovitsy-hram.ru/" target="_blank" class="official-link">Официальный сайт</a></p>
+                
+                <p><strong>Парк "Патриот":</strong> Минимум 2-3 часа. Главные точки — музей военной техники (вход ~500 руб.) и Главный храм Вооруженных сил (бесплатно). Отзывы хвалят масштабность, но предупреждают о больших расстояниях между объектами — удобная обувь обязательна. Еда в кафе на территории дорогая, лучше взять с собой.<br>
+                <a href="https://ru.wikipedia.org/wiki/Патриот_(парк)" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="https://patriotp.ru/" target="_blank" class="official-link">Официальный сайт</a></p>
+                
+                <p><strong>Звенигород (ночевка):</strong> Выберите отель "Татьяна Провинция" (от 3500 руб./ночь) или "Звенигород" (от 3000 руб.). Гости хвалят уют и близость к центру. Вечером прогуляйтесь по набережной Москвы-реки, попробуйте местные пироги в кафе "Усадьба" (средний чек ~700 руб.).<br>
+                <a href="https://ru.wikipedia.org/wiki/Звенигород" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="https://zvenigorod.ru/" target="_blank" class="official-link">Официальный сайт города</a></p>
+                
+                <p><strong>Саввино-Сторожевский монастырь:</strong> Планируйте 1-1,5 часа. Осмотрите Рождественский собор и колокольню, поднимитесь на смотровую площадку — виды потрясающие. Отзывы советуют купить монастырский хлеб и квас в лавке (около 100-150 руб.). Учтите, что парковка может быть переполнена в выходные.<br>
+                <a href="https://ru.wikipedia.org/wiki/Саввино-Сторожевский_монастырь" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="http://www.savvastor.ru/" target="_blank" class="official-link">Официальный сайт</a></p>
+                
+                <p><strong>Новоиерусалимский монастырь:</strong> 2 часа минимум. Воскресенский собор — главная жемчужина, вход в музей ~400 руб. Посетители рекомендуют экскурсию, чтобы понять историю "русской Палестины". Рядом есть кафе "Трапезная" с домашней едой (средний чек ~500 руб.).<br>
+                <a href="https://ru.wikipedia.org/wiki/Новоиерусалимский_монастырь" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="https://njerusalem.ru/" target="_blank" class="official-link">Официальный сайт</a></p>
+                
+                <p><strong>Можайский кремль (ночевка):</strong> 1-1,5 часа. Никольский собор впечатляет, но сам кремль частично в руинах — подойдет для любителей истории. Лужецкий монастырь (10 мин от кремля) тоже стоит внимания. Ночлег в гостинице "Можайск" (от 2500 руб./ночь) хвалят за чистоту, ужинайте в "Старый город" (чек ~600 руб.).<br>
+                <a href="https://ru.wikipedia.org/wiki/Можайский_кремль" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="https://mozhaysk-kreml.ru/" target="_blank" class="official-link">Официальный сайт</a></p>
+                
+                <p><strong>Бородинское поле:</strong> 2-3 часа. Посетите батарею Раевского, музей (вход ~300 руб.) и Спасо-Бородинский монастырь. Отзывы советуют взять аудиогид или экскурсию (от 500 руб.), чтобы разобраться в истории битвы 1812 года. Перекус возможен в кафе у музея, но лучше иметь свой.<br>
+                <a href="https://ru.wikipedia.org/wiki/Бородинское_поле" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="https://borodino.ru/" target="_blank" class="official-link">Официальный сайт</a></p>
+                
+                <p><strong>Усадьба Архангельское:</strong> 1,5-2 часа. Дворец открыт для посещения (вход ~400 руб.), но парк — главная ценность ("русский Версаль"). Туристы хвалят виды у Большого партера и рекомендуют удобную обувь для прогулок. Кафе "Колоннада" дорогое (чек ~800 руб.), берите воду и еду с собой.<br>
+                <a href="https://ru.wikipedia.org/wiki/Архангельское_(усадьба)" target="_blank" class="wiki-link">Википедия</a> | 
+                <a href="http://arhangelskoe.su/" target="_blank" class="official-link">Официальный сайт</a></p>
+            </details>
+        </div>
+    </div>
+
+    <script>
+        ymaps.ready(init);
+
+        var myMap, routesByDay, allPoints, fullRoute;
+
+        function init() {
+            myMap = new ymaps.Map("map", {
+                center: [55.751244, 37.618423],
+                zoom: 8,
+                controls: ['zoomControl', 'trafficControl']
+            });
+
+            var canvas = document.getElementById('map-canvas');
+            var ctx = canvas.getContext('2d');
+            function resizeCanvas() {
+                canvas.width = document.getElementById('map-container').offsetWidth;
+                canvas.height = document.getElementById('map').offsetHeight;
+                drawBackground();
+            }
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            function drawBackground() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'rgba(200, 220, 255, 0.3)';
+                for (let i = 0; i < 20; i++) {
+                    ctx.beginPath();
+                    ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            allPoints = [
+                { coords: [55.7496, 37.7907], name: "Старт: Москва, ул. Реутовская, 12к1", day: "День 1", content: "Начало маршрута" },
+                { coords: [55.5029, 37.5642], name: "Усадьба Остафьево, Москва, поселение Рязановское, село Остафьево, ул. Троицкая, 1А", day: "День 1", content: "" },
+                { coords: [55.4091, 36.9789], name: "Церковь Знамения в Дубровицах, Москва, поселение Десеновское, село Дубровицы", day: "День 1", content: "" },
+                { coords: [55.5631, 36.8007], name: "Парк 'Патриот', Московская область, Одинцовский район, 55-й км Минского шоссе", day: "День 1", content: "" },
+                { coords: [55.6699, 36.6782], name: "Звенигород, Московская область, г. Звенигород, ул. Московская (ночевка)", day: "День 1", content: "Ночевка в Звенигороде", icon: 'islands#redBedIcon' },
+                { coords: [55.6699, 36.6782], name: "Саввино-Сторожевский монастырь, Московская область, г. Звенигород, ул. Советская", day: "День 2", content: "" },
+                { coords: [55.9149, 36.8688], name: "Новоиерусалимский монастырь, Московская область, г. Истра, ул. Советская, 2", day: "День 2", content: "" },
+                { coords: [55.6071, 36.3089], name: "Можайский кремль, Московская область, г. Можайск, ул. Кремлевская (ночевка)", day: "День 2", content: "Ночевка в Можайске", icon: 'islands#redBedIcon' },
+                { coords: [55.5788, 36.2122], name: "Бородинское поле, Московская область, Можайский район, деревня Бородино", day: "День 3", content: "" },
+                { coords: [55.8119, 37.3185], name: "Усадьба Архангельское, Московская область, Красногорский район, поселок Архангельское, ул. Ильинское шоссе", day: "День 3", content: "" },
+                { coords: [55.7496, 37.7907], name: "Финиш: Москва, ул. Реутовская, 12к1", day: "День 3", content: "Конец маршрута" }
+            ];
+
+            routesByDay = {
+                day1: new ymaps.multiRouter.MultiRoute({
+                    referencePoints: allPoints.slice(0, 5).map(p => p.coords),
+                    params: { routingMode: 'auto' }
+                }, { wayPointVisible: false, routeStrokeColor: "#3498db" }),
+                day2: new ymaps.multiRouter.MultiRoute({
+                    referencePoints: allPoints.slice(4, 8).map(p => p.coords),
+                    params: { routingMode: 'auto' }
+                }, { wayPointVisible: false, routeStrokeColor: "#e67e22" }),
+                day3: new ymaps.multiRouter.MultiRoute({
+                    referencePoints: allPoints.slice(7, 11).map(p => p.coords),
+                    params: { routingMode: 'auto' }
+                }, { wayPointVisible: false, routeStrokeColor: "#27ae60" })
+            };
+
+            fullRoute = new ymaps.multiRouter.MultiRoute({
+                referencePoints: allPoints.map(p => p.coords),
+                params: { routingMode: 'auto' }
+            }, { wayPointVisible: false, routeStrokeColor: "#8e44ad" });
+
+            showRoute('day1');
+        }
+
+        function showRoute(day) {
+            myMap.geoObjects.removeAll();
+
+            document.querySelectorAll('#controls button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(day).classList.add('active');
+
+            document.querySelectorAll('.day-section').forEach(section => section.classList.remove('active'));
+            document.getElementById(`desc-${day}`).classList.add('active');
+
+            let visiblePoints, route;
+            if (day === 'full') {
+                visiblePoints = allPoints;
+                route = fullRoute;
+            } else if (day === 'day1') {
+                visiblePoints = allPoints.filter(p => p.day === "День 1");
+                route = routesByDay.day1;
+            } else if (day === 'day2') {
+                visiblePoints = allPoints.filter(p => p.day === "День 2");
+                route = routesByDay.day2;
+            } else if (day === 'day3') {
+                visiblePoints = allPoints.filter(p => p.day === "День 3");
+                route = routesByDay.day3;
+            }
+
+            visiblePoints.forEach(function(point) {
+                var placemark = new ymaps.Placemark(point.coords, {
+                    balloonContentHeader: `<div class="day-label">${point.day}</div>${point.name}`,
+                    balloonContentBody: `<div class="baloon-content">${point.content}</div>`
+                }, {
+                    preset: point.icon || 'islands#blueDotIcon'
+                });
+                myMap.geoObjects.add(placemark);
+            });
+
+            myMap.geoObjects.add(route);
+            myMap.setBounds(myMap.geoObjects.getBounds(), { checkZoomRange: true });
+        }
+    </script>
+</body>
+  </html>
